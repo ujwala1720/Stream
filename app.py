@@ -1,54 +1,40 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Configure Gemini with direct API key
-GEMINI_API_KEY = "paste gemini api key"  # 
-genai.configure(api_key=GEMINI_API_KEY)
+# System prompt with company information
+COMPANY_CONTEXT = """
+You are Raven, the AI assistant for Raven Labs, an Australian-based technology company. 
+Here's important company information to incorporate in your responses:
 
-# Company information database
-COMPANY_INFO = {
-    "about": "Raven Labs is an Australian-based technology company specializing in AI solutions, software development, and digital transformation services.",
-    "services": [
-        "Custom AI Solutions Development",
-        "Enterprise Software Development",
-        "Cloud Computing Services",
-        "Data Analytics & Business Intelligence",
-        "Cybersecurity Solutions"
-    ],
-    "contact": {
-        "email": "info@ravenlabs.au.com",
-        "phone": "+61 2 1234 5678",
-        "address": "Level 12, 123 Tech Street, Sydney NSW 2000, Australia"
-    },
-    "team": "Our team consists of experienced AI researchers, software engineers, and digital transformation experts.",
-    "foundation": "Established in 2018",
-    "clients": "We serve clients across various industries including finance, healthcare, and government sectors."
-}
+- About: Specializes in AI solutions, software development, and digital transformation services
+- Founded: 2018
+- Services: 
+  • Custom AI Solutions Development
+  • Enterprise Software Development
+  • Cloud Computing Services
+  • Data Analytics & Business Intelligence
+  • Cybersecurity Solutions
+- Contact:
+  • Email: info@ravenlabs.au.com
+  • Phone: +61 2 1234 5678
+  • Address: Level 12, 123 Tech Street, Sydney NSW 2000, Australia
+- Team: Experienced AI researchers, software engineers, and digital transformation experts
+- Clients: Various industries including finance, healthcare, and government sectors
 
-def get_company_response(query):
-    """Handle company-specific queries"""
-    query = query.lower()
-    
-    if 'about' in query:
-        return COMPANY_INFO['about']
-    elif 'services' in query:
-        return "Our services include:\n- " + "\n- ".join(COMPANY_INFO['services'])
-    elif 'contact' in query or 'address' in query or 'email' in query:
-        contact = COMPANY_INFO['contact']
-        return f"Contact us at:\nEmail: {contact['email']}\nPhone: {contact['phone']}\nAddress: {contact['address']}"
-    elif 'team' in query:
-        return COMPANY_INFO['team']
-    elif 'found' in query or 'start' in query:
-        return COMPANY_INFO['foundation']
-    elif 'client' in query:
-        return COMPANY_INFO['clients']
-    return None
+Always respond in a professional, friendly tone. Be concise but informative. 
+If asked about capabilities, mention you're powered by Google's Gemini AI.
+"""
 
-def get_general_response(prompt):
-    """Get response from Gemini"""
+def configure_gemini(api_key):
+    """Configure Gemini with API key"""
+    genai.configure(api_key=api_key)
+
+def get_ai_response(prompt):
+    """Get response from Gemini with company context"""
     try:
         model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(prompt)
+        full_prompt = f"{COMPANY_CONTEXT}\n\nUser Query: {prompt}"
+        response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
@@ -56,24 +42,41 @@ def get_general_response(prompt):
 def main():
     st.title("Raven Labs AI Assistant")
     
+    # API key management
+    if 'GEMINI_API_KEY' in st.secrets:
+        api_key = st.secrets['GEMINI_API_KEY']
+    else:
+        api_key = st.sidebar.text_input("Enter Gemini API Key:", type="password")
+    
+    if not api_key:
+        st.warning("Please enter your Gemini API key to continue")
+        st.stop()
+    
+    configure_gemini(api_key)
+
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
-    
+        # Add system greeting
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "Hello! I'm Raven, your AI assistant for Raven Labs. How can I help you today?"
+        })
+
     # Display chat messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-    
-    # Accept user input
+
+    # User input
     if prompt := st.chat_input("How can I help you today?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        company_response = get_company_response(prompt)
-        response = company_response if company_response else get_general_response(prompt)
+        # Get AI response
+        response = get_ai_response(prompt)
         
         with st.chat_message("assistant"):
             st.markdown(response)
